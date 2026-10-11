@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Рикошет: Черно-Белый Минимализм 🎯</title>
+
+    <style>
+        /* БАЗОВЫЕ НАСТРОЙКИ (ТЕМА ПО УМОЛЧАНИЮ - СВЕТЛАЯ) */
+        :root {
+            --bg-color: #f0f0f0;
+            --canvas-bg: #ffffff;
+            --main-color: #000000;
+            --text-muted: #666666;
+            --ach-bg: #000000;
+            --ach-text: #ffffff;
+            --ach-border: #ffffff;
+        }
+
+        /* КЛАСС ДЛЯ ПЕРЕКЛЮЧЕНИЯ НА ТЕМНУЮ ТЕМУ */
+        .dark-theme {
+            --bg-color: #1a1a1a;
+            --canvas-bg: #121212;
+            --main-color: #ffffff;
+            --text-muted: #aaaaaa;
+            --ach-bg: #ffffff;
+            --ach-text: #000000;
+            --ach-border: #000000;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--main-color);
+            overflow: hidden;
+            user-select: none;
+            touch-action: none;
+            /* Плавный переход при смене темы */
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        #topBar {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        /* Игровое поле */
+        canvas {
+            background: var(--canvas-bg);
+            border: 4px solid var(--main-color);
+            border-radius: 6px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            max-width: 90vw;
+            max-height: 70vh;
+        }
+
+        .instructions {
+            margin-top: 15px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+            max-width: 350px;
+        }
+
+        /* --- СТИЛИ ДЛЯ ИНТЕРФЕЙСА МЕНЮ --- */
+        .menu-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .menu-title {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .menu-btn {
+            background: var(--main-color);
+            color: var(--canvas-bg);
+            border: 2px solid var(--main-color);
+            padding: 15px 40px;
+            font-size: 18px;
+            font-family: monospace;
+            font-weight: bold;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            width: 200px;
+            text-align: center;
+            text-transform: uppercase;
+            transition: 0.2s ease;
+        }
+
+        .menu-btn:active {
+            opacity: 0.7;
+        }
+
+        /* Скрытое состояние для окон меню */
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- ЧЕРНО-БЕЛАЯ АЧИВКА --- */
+        .achievement {
+            position: fixed;
+            bottom: -120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ach-bg);
+            border: 2px solid var(--ach-border);
+            padding: 12px 25px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 3000;
+            transition: bottom 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .achievement.show { bottom: 40px; }
+        .ach-icon { font-size: 24px; margin-right: 15px; }
+        .ach-text { display: flex; flex-direction: column; text-align: left; }
+        .ach-title { color: var(--text-muted); font-size: 10px; text-transform: uppercase; }
+        .ach-name { color: var(--canvas-bg); font-size: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. ОКНО ГЛАВНОГО МЕНЮ -->
+    <div class="menu-overlay" id="mainMenu">
+        <div class="menu-title">РИКОШЕТ</div>
+        <button class="menu-btn" onclick="startGame()">Играть</button>
+        <button class="menu-btn" onclick="openSettings()">Настройки</button>
+        <button class="menu-btn" onclick="exitGame()">Выйти</button>
+    </div>
+
+    <!-- 2. ОКНО НАСТРОЕК С ВЫБОРОМ ТЕМЫ -->
+    <div class="menu-overlay hidden" id="settingsMenu">
+        <div class="menu-title">Настройки</div>
+        <button class="menu-btn" onclick="setTheme('light')">Светлая тема</button>
+        <button class="menu-btn" onclick="setTheme('dark')">Темная тема</button>
+        <button class="menu-btn" style="margin-top: 30px;" onclick="closeSettings()">Назад</button>
+    </div>
+
+   <!-- ИГРОВОЙ ЭКРАН -->
+    <div id="topBar">УРОВЕНЬ: 1 | Попытки: 3</div>
+
+    <!-- Сама кнопка выхода во время катки -->
+    <button class="menu-btn" style="width: auto; padding: 8px 20px; font-size: 12px; margin: 0 0 10px 0;" onclick="returnToMenu()">В меню</button>
+
+    <canvas id="gameCanvas" width="400" height="500"></canvas>
+    <div class="instructions">Зажмите на шарике, оттяните назад и отпустите. Используйте стены для рикошета!</div>
+
+    <!-- 4. МИНИМАЛИСТИЧНАЯ АЧИВКА -->
+    <div class="achievement" id="achievementBox">
+        <div class="ach-icon">🔳</div>
+        <div class="ach-text">
+            <span class="ach-title">Точность 100%</span>
+            <span class="ach-name">«Что-то новенькое»</span>
+        </div>
+    </div>
+
+</body>
+<script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const topBar = document.getElementById("topBar");
+        const achBox = document.getElementById("achievementBox");
+
+        // Переменные окон меню
+        const mainMenu = document.getElementById("mainMenu");
+        const settingsMenu = document.getElementById("settingsMenu");
+
+        // ИГРОВЫЕ ОБЪЕКТЫ И ПЕРЕМЕННЫЕ
+        let ball = { x: 200, y: 430, radius: 12, vx: 0, vy: 0, isMoving: false };
+        let target = { x: 200, y: 70, radius: 20 };
+
+        // Базовый пустой массив для стен, они будут создаваться кодом
+        let obstacles = [];
+
+        let level = 1; // Текущий уровень (начинаем с 1)
+        let attempts = 3;
+        let isAiming = false;
+        let aimMouse = { x: 0, y: 0 };
+        let gameWon = false;
+        let isGameActive = false;
+        let achUnlocked = false; // Чтобы ачивка вылетала ТОЛЬКО ОДИН РАЗ в начале
+
+        // ФУНКЦИЯ ГЕНЕРАЦИИ БЕСКОНЕЧНЫХ УРОВНЕЙ
+        function generateLevel(currentLevel) {
+            obstacles = []; // Очищаем старые стены
+
+            // Количество стен зависит от уровня (минимум 2, максимум 4)
+            let obstacleCount = Math.min(2 + Math.floor(currentLevel / 5), 4);
+
+            for (let i = 0; i < obstacleCount; i++) {
+                // Генерируем случайную ширину и положение стен
+                let width = Math.floor(Math.random() * 80) + 60; // от 60 до 140 пикселей
+                let height = 15;
+
+                // Стены создаются в игровой зоне по высоте от Y=130 до Y=320
+                let x = Math.floor(Math.random() * (canvas.width - width - 20)) + 10;
+                let y = 130 + (i * 50) + Math.floor(Math.random() * 20);
+
+                obstacles.push({ x: x, y: y, w: width, h: height });
+            }
+
+            // Случайно двигаем мишень влево-вправо на каждом уровне для разнообразия
+            target.x = Math.floor(Math.random() * (canvas.width - 80)) + 40;
+        }
+
+        // ЛОГИКА ОКНО МЕНЮ
+        function startGame() {
+            mainMenu.classList.add("hidden");
+            isGameActive = true;
+            level = 1;
+            attempts = 3;
+            generateLevel(level); // Генерируем первый уровень
+            updateUI();
+        }
+
+        // ОТКРЫТИЕ И ЗАКРЫТИЕ НАСТРОЕК
+        function openSettings() {
+            mainMenu.classList.add("hidden");
+            settingsMenu.classList.remove("hidden");
+        }
+
+        function closeSettings() {
+            settingsMenu.classList.add("hidden");
+            mainMenu.classList.remove("hidden");
+        }
+
+        function exitGame() {
+            alert("Спасибо за игру!");
+            location.reload();
+        }
+
+        // --- ВОТ ЭТОТ НОВЫЙ БЛОК ВСТАВИТЬ СЮДА ---
+        function returnToMenu() {
+            gameWon = false;
+            isGameActive = false;
+            resetBallPosition();
+            mainMenu.classList.remove("hidden");
+        }
+
+
+
+
+
+        // НАСТРОЙКА СМЕНЫ ТЕМЫ
+        let currentTheme = 'light';
+        function setTheme(theme) {
+            currentTheme = theme;
+            if (theme === 'dark') {
+                document.body.classList.add("dark-theme");
+            } else {
+                document.body.classList.remove("dark-theme");
+            }
+        }
+
+        function getMainColor() {
+            return currentTheme === 'dark' ? "#ffffff" : "#000000";
+        }
+
+       // ОБРАБОТКА ТАПОВ И ПРИЦЕЛИВАНИЯ (ОТПРАВЛЕНО НА ВЕСЬ ЭКРАН WINDOW)
+        canvas.addEventListener("mousedown", startAiming);
+        window.addEventListener("mousemove", drawAim); // Теперь двигать можно по всему экрану
+        window.addEventListener("mouseup", shootBall);
+
+        canvas.addEventListener("touchstart", (e) => { startAiming(e.touches[0]); });
+        window.addEventListener("touchmove", (e) => {
+            if (isAiming) {
+                drawAim(e.touches[0]);
+                e.preventDefault(); // Запрещаем экрану телефона дергаться вверх-вниз при натяжении
+            }
+        }, { passive: false }); // Важная настройка для мобильных браузеров
+        window.addEventListener("touchend", shootBall);
+
+        function startAiming(e) {
+            if (!isGameActive || ball.isMoving || attempts <= 0 || gameWon) return;
+            let rect = canvas.getBoundingClientRect();
+
+            // Считаем клик относительно холста
+            let mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            let mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            let dist = Math.hypot(mouseX - ball.x, mouseY - ball.y);
+            if (dist < ball.radius + 25) { // Чуть увеличили зону захвата, чтобы пальцем было легче попасть
+                isAiming = true;
+                aimMouse.x = mouseX;
+                aimMouse.y = mouseY;
+            }
+        }
+
+        function drawAim(e) {
+            if (!isAiming) return;
+            let rect = canvas.getBoundingClientRect();
+
+            // Магия: координаты считаются даже если палец УЛЕТЕЛ ДАЛЕКО за пределы canvas
+            aimMouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            aimMouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        }
+
+        function startAiming(e) {
+            if (!isGameActive || ball.isMoving || attempts <= 0 || gameWon) return;
+            let rect = canvas.getBoundingClientRect();
+            let mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            let mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            let dist = Math.hypot(mouseX - ball.x, mouseY - ball.y);
+            if (dist < ball.radius + 20) {
+                isAiming = true;
+                aimMouse.x = mouseX;
+                aimMouse.y = mouseY;
+            }
+        }
+
+        function drawAim(e) {
+            if (!isAiming) return;
+            let rect = canvas.getBoundingClientRect();
+            aimMouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            aimMouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        }
+
+        function shootBall() {
+            if (!isAiming) return;
+            isAiming = false;
+
+            let dx = ball.x - aimMouse.x;
+            let dy = ball.y - aimMouse.y;
+
+            ball.vx = dx * 0.12;
+            ball.vy = dy * 0.12;
+            ball.isMoving = true;
+            attempts--;
+            updateUI();
+        }
+
+        function updateUI() {
+            if (gameWon) {
+                topBar.innerHTML = `УРОВЕНЬ ${level} ПРОЙДЕН! 🎉 (Тап для следующего)`;
+            } else if (attempts <= 0 && !ball.isMoving) {
+                topBar.innerHTML = `ИГРА ОКОНЧЕНА! Дошли до уровня: ${level} (Тап для меню)`;
+            } else {
+                topBar.innerHTML = `УРОВЕНЬ: ${level} | Попытки: ${attempts}`;
+            }
+        }
+
+        // ГЛАВНЫЙ ИГРОВОЙ ЦИКЛ ОБНОВЛЕНИЯ КАДРОВ
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let color = getMainColor();
+
+            // 1. Рисуем мишень
+            ctx.beginPath();
+            ctx.arc(target.x, target.y, target.radius, 0, Math.PI * 2);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(target.x, target.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            // 2. Рисуем сгенерированные стены
+            ctx.fillStyle = color;
+            obstacles.forEach(obs => {
+                ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+            });
+
+            // 3. Линия прицела
+            if (isAiming) {
+                ctx.beginPath();
+                ctx.moveTo(ball.x, ball.y);
+                ctx.lineTo(ball.x + (ball.x - aimMouse.x), ball.y + (ball.y - aimMouse.y));
+                ctx.strokeStyle = currentTheme === 'dark' ? "#666666" : "#999999";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // 4. Расчет физики и рикошетов
+            if (ball.isMoving && isGameActive) {
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+                ball.vx *= 0.99;
+                ball.vy *= 0.99;
+
+                if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
+                    ball.vx *= -1;
+                    ball.x = ball.x - ball.radius < 0 ? ball.radius : canvas.width - ball.radius;
+                }
+                if (ball.y - ball.radius < 0) {
+                    ball.vy *= -1;
+                    ball.y = ball.radius;
+                }
+
+                if (ball.y - ball.radius > canvas.height) {
+                    resetBallPosition();
+                }
+
+                obstacles.forEach(obs => {
+                    let closestX = Math.max(obs.x, Math.min(ball.x, obs.x + obs.w));
+                    let closestY = Math.max(obs.y, Math.min(ball.y, obs.y + obs.h));
+                    let distanceSquared = ((ball.x - closestX) ** 2) + ((ball.y - closestY) ** 2);
+
+                    if (distanceSquared < (ball.radius * ball.radius)) {
+                        if (Math.abs(ball.x - closestX) > Math.abs(ball.y - closestY)) {
+                            ball.vx *= -1;
+                        } else {
+                            ball.vy *= -1;
+                        }
+                    }
+                });
+
+                // Проверка попадания в мишень
+                let distToTarget = Math.hypot(ball.x - target.x, ball.y - target.y);
+                if (distToTarget < ball.radius + target.radius && !gameWon) {
+                    gameWon = true;
+                    ball.isMoving = false;
+                    updateUI();
+
+                    // Выдаем ачивку ТОЛЬКО на 1-м уровне и только один раз за запуск
+                    if (level === 1 && !achUnlocked) {
+                        achUnlocked = true;
+                        triggerAchievement();
+                    }
+                }
+
+                if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1) {
+                    resetBallPosition();
+                }
+            }
+
+            // 5. Рисуем шарик
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            requestAnimationFrame(updateGame);
+        }
+
+        function resetBallPosition() {
+            ball.isMoving = false;
+            ball.x = 200;
+            ball.y = 430;
+            ball.vx = 0;
+            ball.vy = 0;
+            updateUI();
+        }
+
+        function triggerAchievement() {
+            achBox.classList.add("show");
+            setTimeout(function() { achBox.classList.remove("show"); }, 4000);
+        }
+
+       // ОБРАБОТКА КЛИКОВ ПОСЛЕ ОКОНЧАНИЯ ИГРЫ
+        window.addEventListener("click", (e) => {
+            if (!isGameActive) return;
+
+            // Если кликнули на кнопку «В меню», не переключаем уровень
+            if (e.target.tagName === 'BUTTON') return;
+
+            // Сценарий 1: Уровень пройден успешно -> переходим на следующий уровень
+            if (gameWon) {
+                gameWon = false;
+                level++;
+                attempts = 3;
+                resetBallPosition();
+                generateLevel(level);
+                updateUI();
+            }
+            // Сценарий 2: Попытки кончились -> выходим обратно в меню
+            else if (attempts <= 0 && !ball.isMoving) {
+                gameWon = false;
+                isGameActive = false;
+                resetBallPosition();
+                mainMenu.classList.remove("hidden");
+            }
+        });
+    // Запуск анимационного движка
+        updateGame();
+    </script>
+</body>
+</html>
